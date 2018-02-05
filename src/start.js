@@ -48,7 +48,14 @@ if (config.meterName2) {
 var counterDisplayInterval = config.counterDisplayInterval
 const verboseLogging = config.verboseLogging
 
-const displayClient = new DisplayClient(displayRpcPort, verboseLogging)
+let displayClient
+if (displayRpcPort && displayRpcPort != 0 && displayRpcPort != "0") {
+  console.log("I will talk to a display via RPC on port " + displayRpcPort)
+  displayClient = new DisplayClient(displayRpcPort, verboseLogging)
+} else {
+  console.log("No valid displayRpcPort set, so I'll use console.log")
+  displayClient = null
+}
 
 
 console.log("I will talk to " + serverUrl)
@@ -127,17 +134,25 @@ function showCustomerInfoAndSupportPhone() {
  */
 function showQrCode() {
   const registrationUrl = getRegistrationUrl()
-  //displayClient.callAndRetry('setQrCode', [registrationUrl, false, qrCodeDisplayTab])
-  displayClient.callAndRetry('setRowText', ["Hej Sia!", 1, false, qrCodeDisplayTab])
-
+  if (displayClient) {
+    displayClient.callAndRetry('setQrCode', [registrationUrl, false, qrCodeDisplayTab])
+  } else {
+    console.log("If I had a display, I would show a QR code for this registration URL: " + registrationUrl)
+  }
 }
 
 function displayLine(row, text) {
   if (text) {
-    displayClient.callAndRetry('setRowText', [text, row, false, mainDisplayTab])
-  } else [
-    displayClient.callAndRetry('clearRow', [row, mainDisplayTab])
-  ]
+    if (displayClient) {
+      displayClient.callAndRetry('setRowText', [text, row, false, mainDisplayTab])
+    } else {
+      console.log(text)
+    }
+  } else {
+    if (displayClient) {
+      displayClient.callAndRetry('clearRow', [row, mainDisplayTab])
+    }
+  }
 }
 
 function showPulseCount() {
@@ -161,8 +176,6 @@ function getMeterName() {
   config = require('./meter-config').loadConfig()
   return config.meterName
 }
-
-const meterName = getMeterName()
 
 pulseCounter.clear()
 
