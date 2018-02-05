@@ -127,7 +127,9 @@ function showCustomerInfoAndSupportPhone() {
  */
 function showQrCode() {
   const registrationUrl = getRegistrationUrl()
-  displayClient.callAndRetry('setQrCode', [registrationUrl, false, qrCodeDisplayTab])
+  //displayClient.callAndRetry('setQrCode', [registrationUrl, false, qrCodeDisplayTab])
+  displayClient.callAndRetry('setRowText', ["Hej Sia!", 1, false, qrCodeDisplayTab])
+
 }
 
 function displayLine(row, text) {
