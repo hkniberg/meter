@@ -135,9 +135,7 @@ function showCustomerInfoAndSupportPhone() {
 function showQrCode() {
   const registrationUrl = getRegistrationUrl()
   if (displayClient) {
-    //displayClient.callAndRetry('setQrCode', [registrationUrl, false, qrCodeDisplayTab])
-    displayClient.callAndRetry('setRowText', ["Hi JFokus!", 1, false, qrCodeDisplayTab])
-
+    displayClient.callAndRetry('setQrCode', [registrationUrl, false, qrCodeDisplayTab])
   } else {
     console.log("If I had a display, I would show a QR code for this registration URL: " + registrationUrl)
   }
