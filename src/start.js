@@ -72,8 +72,8 @@ function watchForPulses() {
     meterNames = [config.meterName]
   }
   
-  const notificationSender = new EnergyNotificationSender(serverUrl, serverTimeoutSeconds, retryConfig)
-  const pulseProcessor = new PulseProcessor(config.dataDir, meterNames, eventInterval, maxEventsPerNotification, energyPerPulse, notificationSender)
+  const notificationSender = new EnergyNotificationSender(serverUrl, serverTimeoutSeconds, retryConfig, verboseLogging)
+  const pulseProcessor = new PulseProcessor(config.dataDir, meterNames, eventInterval, maxEventsPerNotification, energyPerPulse, notificationSender, verboseLogging)
   processInboxAndRepeat(pulseProcessor)
 }
 

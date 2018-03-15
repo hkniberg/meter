@@ -2,13 +2,14 @@ const fs = require('fs')
 const path = require('path')
 const moment = require('moment')
 const util = require('./util')
+const series = require('series')
 
 /**
  * I know how to read pulses from the inbox(es) and send notifications to the server.
  * See readPulsesAndSendEnergyNotification for details.
  */
 class PulseProcessor {
-  constructor(dataDir, meterNames, eventInterval, maxEventsPerNotification, energyPerPulse, energyNotificationSender) {
+  constructor(dataDir, meterNames, eventInterval, maxEventsPerNotification, energyPerPulse, energyNotificationSender, verboseLogging) {
     console.assert(dataDir, "No dataDir!")
     util.makeDirIfMissing(dataDir)
     this.dataDir = dataDir
@@ -29,6 +30,9 @@ class PulseProcessor {
     this.energyNotificationSender = energyNotificationSender
 
     this.lastIncompleteEvent = {} //one per meterName
+    
+    this.verboseLogging = verboseLogging
+    
     this._loadLastIncompleteEventForAllMeters()
   }
 
@@ -109,10 +113,16 @@ class PulseProcessor {
     if (sendAllNotificationsInASingleRequest) {
       //Let's send a single request with all notifications,
       //and store the resulting promise in notificationSendPromises
+      if (this.verboseLogging) {
+        console.log("I will send " + notificationsToSend.length + " notifications in a single request")
+      }
       notificationSendPromises.push(this.energyNotificationSender.sendEnergyNotifications(notificationsToSend))
     } else {
       //Let's loop through each notification and trigger a separate request.
       //We'll store each resulting promise in notificationSendPromises
+      if (this.verboseLogging) {
+        console.log("I will send " + notificationsToSend.length + " notifications as separate requests")
+      }
       notificationsToSend.forEach((notification) => {
         notificationSendPromises.push(this.energyNotificationSender.sendEnergyNotification(notification))
       })
@@ -123,10 +133,12 @@ class PulseProcessor {
     notificationsToSend.forEach((notification) => {
       eventCount = eventCount + notification.events.length
     })
+    if (this.verboseLogging) {
+      console.log("... the notifications contain " + eventCount + " in total")
+    }
 
-
-    //Return a promise that waits for all notifications to complete
-    return Promise.all(notificationSendPromises)
+    //Return a promise that waits for all notifications to complete, in sequence
+    return series(notificationSendPromises)
       .then(() => {
         //OK, all notications were successfully sent (or there weren't any)
         //Let's update the file state.

@@ -7,7 +7,7 @@ const requestPromise = require('request-promise-native')
  * @param retryConfig see https://www.npmjs.com/package/promise-retry
  */
 class EnergyNotificationSender {
-  constructor(serverUrl, serverTimeoutSeconds, retryConfig) {
+  constructor(serverUrl, serverTimeoutSeconds, retryConfig, verboseLogging) {
     console.assert(serverUrl, "missing serverUrl")
     this.serverUrl = serverUrl
 
@@ -16,6 +16,8 @@ class EnergyNotificationSender {
 
     console.assert(retryConfig, "missing retryConfig")
     this.retryConfig = retryConfig
+
+    this.verboseLogging = verboseLogging
   }
 
   /**
@@ -28,26 +30,34 @@ class EnergyNotificationSender {
    * If the given events array is empty, no notifications are sent and the promise resolves immediately.
    */
   sendEnergyNotifications(notifications) {
+    const verboseLogging = this.verboseLogging
+
     if (notifications.length == 0) {
       return new Promise(function(resolve, reject) {
         resolve()
       })
     }
 
-    return promiseRetry((retry, number) => {
-      if (number > 1) {
-        console.log('...send attempt number', number);
+    const startTime = new Date().getTime()
+    return promiseRetry((retry, attemptNumber) => {
+      if (verboseLogging || attemptNumber > 1) {
+        console.log("(attempt #" + attemptNumber + ") Sending a request with " + notifications.length + " notifications...")
       }
       return this._sendEnergyNotifications(notifications)
         .then((result) => {
           if (result.statusCode >= 200 && result.statusCode <= 300) {
             //worked!
+            const durationMs = new Date().getTime() - startTime
+            if (verboseLogging) {
+              console.log("  (attempt #" + attemptNumber + ") Successfully sent request with " + notifications.length + " notifications! Took " + durationMs + "ms")
+            }
           } else {
             throw new Error("Got status code " + result.statusCode + " and message '" + result.message + "'!")
           }
         })
         .catch((error) => {
-          console.log("Send failed! Will retry. " +  error)
+          const durationMs = new Date().getTime() - startTime
+          console.log("  (attempt #" + attemptNumber + ") Failed to send request with " + notifications.length + " notifications. Took " + durationMs + "ms. Will retry." + error)
           retry()
         });
     }, this.retryConfig)
