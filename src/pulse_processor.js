@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const moment = require('moment')
 const util = require('./util')
-const series = require('series')
+const series = require('es6-promise-series')
 
 /**
  * I know how to read pulses from the inbox(es) and send notifications to the server.
