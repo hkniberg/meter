@@ -62,6 +62,9 @@ energyPerPulse: "1"
 # Should be a string, so don't skip the quotes.
 logPulseDetection: "true"
 
+# If true, I log everything that I write to the display
+logDisplay: "false"
+
 # If true, logs stuff that happens over and over again
 # Should be a string, so don't skip the quotes.
 verboseLogging: "true"

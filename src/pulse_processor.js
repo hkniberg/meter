@@ -134,7 +134,7 @@ class PulseProcessor {
       eventCount = eventCount + notification.events.length
     })
     if (this.verboseLogging) {
-      console.log("... the notifications contain " + eventCount + " in total")
+      console.log("... the notifications contain " + eventCount + " energy events in total")
     }
 
     //Return a promise that waits for all notifications to complete, in sequence

@@ -73,20 +73,33 @@ class EnergyNotificationSender {
    * If the notification doesn't have any events, no notification is sent and the promise resolves immediately.
    */
   sendEnergyNotification(notification) {
+    const verboseLogging = this.verboseLogging
+
     if (!notification.events || notification.events.length == 0) {
       return new Promise(function(resolve, reject) {
         resolve()
       })
     }
+    const eventCount = notification.events.length
 
-    return promiseRetry((retry, number) => {
-      if (number > 1) {
-        console.log('...send attempt number', number);
+    const startTime = new Date().getTime()
+    return promiseRetry((retry, attemptNumber) => {
+      if (verboseLogging || attemptNumber > 1) {
+        console.log("(attempt #" + attemptNumber + ") Sending a notification with " + eventCount + " events...")
       }
-      return this._sendEnergyNotification(notification).catch((error) => {
-        console.log("send failed! Will retry. " +  error)
-        retry()
-      });
+      return this._sendEnergyNotification(notification)
+        .then((result) => {
+          //Worked!
+          const durationMs = new Date().getTime() - startTime
+          if (verboseLogging) {
+            console.log("  (attempt #" + attemptNumber + ") Successfully sent notification with " + eventCount + " events! Took " + durationMs + "ms")
+          }
+        })
+        .catch((error) => {
+          const durationMs = new Date().getTime() - startTime
+          console.log("  (attempt #" + attemptNumber + ") Failed to send notification with " + eventCount + " events. Took " + durationMs + "ms. Will retry." + error)
+          retry()
+        });
     }, this.retryConfig)
   }
   
