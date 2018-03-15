@@ -2,7 +2,6 @@ const fs = require('fs')
 const path = require('path')
 const moment = require('moment')
 const util = require('./util')
-const series = require('es6-promise-series')
 const executeTasksInSequence = require('./util').executeTasksInSequence
 
 /**
