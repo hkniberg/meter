@@ -59,7 +59,7 @@ exports.executeTasksInSequence = function(tasks) {
   //This icky code is explained here: https://decembersoft.com/posts/promises-in-serial-with-array-reduce/
   return tasks.reduce((promiseChain, currentTask) => {
     return promiseChain.then(chainResults =>
-      new Promise(currentTask).then(currentResult =>
+      currentTask().then(currentResult =>
         [ ...chainResults, currentResult ]
       )
     );
