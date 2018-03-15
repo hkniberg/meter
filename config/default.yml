@@ -98,7 +98,7 @@ customerAddress:
 # Retry settings for when the serverUrl isn't reachable.
 # or when the display isn't available
 retry:
-  minTimeout: 1000 #First retry is after 1 second
-  factor: 2 #and next retry will be after 2 seconds, then 4 seconds, 8 seconds, 16 seconds...
+  minTimeout: 5000 #First retry is after 5 second
+  factor: 2 #and next retry will be after 10 seconds, then 20 seconds.
   maxTimeout: 30000 #and all retries after that will be in 30 second intervals
   retries: 100000 #That's about 1 month of retrying! 100,000 x 30 seconds.
