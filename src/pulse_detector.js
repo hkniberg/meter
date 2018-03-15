@@ -30,7 +30,7 @@ class PulseDetector {
 
     if (RpioClickDetector.hasRpio()) {
       console.log("RPIO detected. Will listen for clicks on pin " + this.pulseInputPin)
-      this.clickDetector = new RpioClickDetector(this.pulseInputPin, this.verboseLogging)
+      this.clickDetector = new RpioClickDetector(this.pulseInputPin, false)
     } else {
       console.log("No RPIO detected. Can't detect clicks.")
       this.clickDetector = new FakeClickDetector()
