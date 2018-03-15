@@ -122,8 +122,9 @@ class PulseProcessor {
         console.log("I will send " + notificationsToSend.length + " notifications in a single request")
       }
       notificationSendTasks.push(() => {
-        this.energyNotificationSender.sendEnergyNotifications(notificationsToSend)
+        return this.energyNotificationSender.sendEnergyNotifications(notificationsToSend)
       })
+      
     } else {
       //Let's loop through each notification and trigger a separate request.
       //We'll store each resulting promise in notificationSendPromises
@@ -132,7 +133,7 @@ class PulseProcessor {
       }
       notificationsToSend.forEach((notification) => {
         notificationSendTasks.push(() => {
-          this.energyNotificationSender.sendEnergyNotification(notification)
+          return this.energyNotificationSender.sendEnergyNotification(notification)
         })
       })
     }
