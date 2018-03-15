@@ -3,6 +3,7 @@ const path = require('path')
 const moment = require('moment')
 const util = require('./util')
 const series = require('es6-promise-series')
+const executeTasksInSequence = require('./util').executeTasksInSequence
 
 /**
  * I know how to read pulses from the inbox(es) and send notifications to the server.
@@ -109,14 +110,21 @@ class PulseProcessor {
       notificationsToSend = notificationsToSend.concat(notificationsForThisMeter)
     })
 
-    const notificationSendPromises = []
+    //Make an array of "tasks" (= functions that return promises)
+    //The reason why we take that instead of just promises directly,
+    // is because promises start executing directly on creation.
+    //We don't want that. We want to execute them in sequence.    
+    const notificationSendTasks = []
+    
     if (sendAllNotificationsInASingleRequest) {
       //Let's send a single request with all notifications,
       //and store the resulting promise in notificationSendPromises
       if (this.verboseLogging) {
         console.log("I will send " + notificationsToSend.length + " notifications in a single request")
       }
-      notificationSendPromises.push(this.energyNotificationSender.sendEnergyNotifications(notificationsToSend))
+      notificationSendTasks.push(() => {
+        this.energyNotificationSender.sendEnergyNotifications(notificationsToSend)
+      })
     } else {
       //Let's loop through each notification and trigger a separate request.
       //We'll store each resulting promise in notificationSendPromises
@@ -124,7 +132,9 @@ class PulseProcessor {
         console.log("I will send " + notificationsToSend.length + " notifications as separate requests")
       }
       notificationsToSend.forEach((notification) => {
-        notificationSendPromises.push(this.energyNotificationSender.sendEnergyNotification(notification))
+        notificationSendTasks.push(() => {
+          this.energyNotificationSender.sendEnergyNotification(notification)
+        })
       })
     }
 
@@ -138,7 +148,7 @@ class PulseProcessor {
     }
 
     //Return a promise that waits for all notifications to complete, in sequence
-    return series(notificationSendPromises)
+    return executeTasksInSequence(notificationSendTasks)
       .then(() => {
         //OK, all notications were successfully sent (or there weren't any)
         //Let's update the file state.

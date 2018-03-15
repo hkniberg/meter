@@ -45,4 +45,24 @@ exports.makeDirIfMissing = function(dir) {
   }
 }
 
+/*
+   Returns a promise that executes the given tasks, in sequence.
+   Resolves with an array of all results (I think).
+
+   Each given task should be a function that returns a promise.
+
+   The reason why we take that instead of just promises directly,
+   is because promises start executing directly on creation.
+   We don't want that. We want to execute them in sequence.
+ */
+exports.executeTasksInSequence = function(tasks) {
+  //This icky code is explained here: https://decembersoft.com/posts/promises-in-serial-with-array-reduce/
+  return tasks.reduce((promiseChain, currentTask) => {
+    return promiseChain.then(chainResults =>
+      new Promise(currentTask).then(currentResult =>
+        [ ...chainResults, currentResult ]
+      )
+    );
+  }, Promise.resolve([]))
+}
 
