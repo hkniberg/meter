@@ -121,11 +121,13 @@ function showCustomerInfoAndSupportPhone() {
     displayLine(1, customerAddress)
     displayLine(2, "Support:")
   }
+  let nextRow = 3
   if (supportPhoneNumber) {
-    displayLine(3, "  " + supportPhoneNumber)
+    displayLine(nextRow, "  " + supportPhoneNumber)
+    nextRow += 1
   }
   if (supportUrl) {
-    displayLine(4, "  " + supportUrl)
+    displayLine(nextRow, "  " + supportUrl)
   }
 }
 
