@@ -65,7 +65,7 @@ class PulseDetector {
   }
 
   _addPulseToInbox(pulse) {
-    fs.appendFile(this.inboxFile, pulse + "\n", function(err) {
+    fs.appendFile(this.inboxFile, pulse + "\n", (err) => {
       if (err) {
         console.log("Something went wrong when adding a pulse for " + this.meterName + " to inbox", pulse, err)
       }
