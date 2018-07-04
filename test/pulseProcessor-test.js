@@ -33,7 +33,7 @@ describe('PulseProcessor', function() {
     const eventInterval = 10
     const maxEventsPerNotification = 5
     const energyPerPulse = 1
-    const verboseLogging = false
+    const verboseLogging = true
     this.processor = new PulseProcessor("data", [meterName], eventInterval, maxEventsPerNotification, energyPerPulse, this.sender, verboseLogging)
     fs.mkdirSync("data/" + meterName)
   })
@@ -87,16 +87,17 @@ describe('PulseProcessor', function() {
   it("_getPulsesInProcessing", function() {
     add("2016-02-01 12:30:44.343")
     this.processor._stealInbox(meterName)
-    const pulses = this.processor._getPulsesInProcessing(meterName)
-
-    expect(pulses.length).to.equal(1)
-    expect(pulses[0]).to.equalTime(new Date("2016-02-01T12:30:44.343Z"))
+    return this.processor._getPulsesInProcessing(meterName).then((pulses) => {
+      return Promise.all([
+        expect(pulses.length).to.equal(1),
+        expect(pulses[0]).to.equalTime(new Date("2016-02-01T12:30:44.343Z"))
+      ])
+    })
   })
 
   it('no inbox', function() {
-    expect(
-      this.processor._createEnergyEventsFromPulses(meterName)).to
-      .deep.equal([])
+    return expect(
+      this.processor._createEnergyEventsFromPulses(meterName)).to.eventually.deep.equal([])
   })
 
   it('load/save lastIncompleteEvent', function() {
@@ -139,17 +140,20 @@ describe('PulseProcessor', function() {
     add("2016-05-05 10:00:02.030")
     this.processor._stealInbox(meterName)
 
-    expect(this.processor._createEnergyEventsFromPulses(meterName))
-      .to.deep.equal([])
+    console.log("last event before: ", this.processor.lastIncompleteEvent[meterName])
 
-    expect(this.processor.lastIncompleteEvent[meterName])
-      .to.deep.equal(
-      {
-        endTime: "2016-05-05T10:00:10.000Z",
-        seconds: 10,
-        energy: 1
-      }
-    )
+    return expect(this.processor._createEnergyEventsFromPulses(meterName))
+      .to.eventually.deep.equal([])
+      .then(() => {
+        return expect(this.processor.lastIncompleteEvent[meterName])
+          .to.deep.equal(
+            {
+              endTime: "2016-05-05T10:00:10.000Z",
+              seconds: 10,
+              energy: 1
+            }
+          )
+      })
   })
 
   it('process 2 pulses in same bucket', function() {
@@ -158,16 +162,19 @@ describe('PulseProcessor', function() {
     this.processor._stealInbox(meterName)
 
     expect(this.processor._createEnergyEventsFromPulses(meterName))
-      .to.deep.equal([])
+      .to.eventually.deep.equal([])
+      .then(() => {
+        return expect(this.processor.lastIncompleteEvent[meterName])
+          .to.deep.equal(
+          {
+            endTime: "2016-05-05T10:00:10.000Z",
+            seconds: 10,
+            energy: 2
+          }
+        )
 
-    expect(this.processor.lastIncompleteEvent[meterName])
-      .to.deep.equal(
-      {
-        endTime: "2016-05-05T10:00:10.000Z",
-        seconds: 10,
-        energy: 2
-      }
-    )
+      })
+
   })
 
   it('process 2 pulses in different buckets', function() {
@@ -176,22 +183,25 @@ describe('PulseProcessor', function() {
     this.processor._stealInbox(meterName)
 
     expect(this.processor._createEnergyEventsFromPulses(meterName))
-      .to.deep.equal([
+      .to.eventually.deep.equal([
       {
         endTime: "2016-05-05T10:00:10.000Z",
         seconds: 10,
         energy: 1
       }
     ])
+      .then(() => {
+        expect(this.processor.lastIncompleteEvent[meterName])
+          .to.deep.equal(
+          {
+            endTime: "2016-05-05T10:00:20.000Z",
+            seconds: 10,
+            energy: 1
+          }
+        )
 
-    expect(this.processor.lastIncompleteEvent[meterName])
-      .to.deep.equal(
-      {
-        endTime: "2016-05-05T10:00:20.000Z",
-        seconds: 10,
-        energy: 1
-      }
-    )
+      })
+
   })
 
   it('process pulses with big gap in time', function() {
@@ -204,7 +214,7 @@ describe('PulseProcessor', function() {
     this.processor._stealInbox(meterName)
 
     expect(this.processor._createEnergyEventsFromPulses(meterName))
-      .to.deep.equal([
+      .to.eventually.deep.equal([
       {
         endTime: "2016-05-05T17:33:10.000Z",
         seconds: 10,
@@ -216,15 +226,18 @@ describe('PulseProcessor', function() {
         energy: 3
       }
     ])
+      .then(() => {
+        return expect(this.processor.lastIncompleteEvent[meterName])
+          .to.deep.equal(
+            {
+              endTime: "2016-05-06T07:01:40.000Z",
+              seconds: 10,
+              energy: 1
+            }
+          )
 
-    expect(this.processor.lastIncompleteEvent[meterName])
-      .to.deep.equal(
-      {
-        endTime: "2016-05-06T07:01:40.000Z",
-        seconds: 10,
-        energy: 1
-      }
-    )
+      })
+
   })
 
   it('maxEventsPerNotification', function() {

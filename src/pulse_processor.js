@@ -4,6 +4,8 @@ const moment = require('moment')
 const util = require('./util')
 const executeTasksInSequence = require('./util').executeTasksInSequence
 
+const LineByLineReader = require('line-by-line')
+
 /**
  * I know how to read pulses from the inbox(es) and send notifications to the server.
  * See readPulsesAndSendEnergyNotification for details.
@@ -98,66 +100,86 @@ class PulseProcessor {
     //false if we will send each notification in a separate request
 
     //Loop through each meter, figure out which notifications to send,
-    //and put them in notificationSendPromises
+    //and put them in notificationPromises
+    const notificationPromises = []
     this.meterNames.forEach((meterName) => {
-      const notificationsForThisMeter = this._createEnergyNotifications(meterName)
-      if (notificationsForThisMeter.length > 1) {
-        //Oh, this was divided into several separate notifications for this one meter.
-        //That means we got a lot of events to send, and will send them in separate requests.
-        sendAllNotificationsInASingleRequest = false
-      }
-      notificationsToSend = notificationsToSend.concat(notificationsForThisMeter)
+      const notificationsPromiseForThisMeter = this._createEnergyNotifications(meterName)
+      notificationPromises.push(notificationsPromiseForThisMeter)
     })
 
-    //Make an array of "tasks" (= functions that return promises)
-    //The reason why we take that instead of just promises directly,
-    // is because promises start executing directly on creation.
-    //We don't want that. We want to execute them in sequence.    
-    const notificationSendTasks = []
-    
-    if (sendAllNotificationsInASingleRequest) {
-      //Let's send a single request with all notifications,
-      //and store the resulting promise in notificationSendPromises
-      if (this.verboseLogging) {
-        console.log("I will send " + notificationsToSend.length + " notifications in a single request")
-      }
-      notificationSendTasks.push(() => {
-        return this.energyNotificationSender.sendEnergyNotifications(notificationsToSend)
-      })
-      
-    } else {
-      //Let's loop through each notification and trigger a separate request.
-      //We'll store each resulting promise in notificationSendPromises
-      if (this.verboseLogging) {
-        console.log("I will send " + notificationsToSend.length + " notifications as separate requests")
-      }
-      notificationsToSend.forEach((notification) => {
-        notificationSendTasks.push(() => {
-          return this.energyNotificationSender.sendEnergyNotification(notification)
+    //Wait for all notificationPromises to resolve
+    return Promise.all(notificationPromises)
+      .then((notificationsForEachMeter) => {
+        //OK, we've created all notifications. They are in notificationsForEachMeter
+
+        //Loop through each meter....
+        notificationsForEachMeter.forEach((notificationsForThisMeter) => {
+          if (notificationsForThisMeter.length > 1) {
+            //Oh, this was divided into several separate notifications for this one meter.
+            //That means we got a lot of events to send, and will send them in separate requests.
+            sendAllNotificationsInASingleRequest = false
+          }
+          notificationsToSend = notificationsToSend.concat(notificationsForThisMeter)
         })
-      })
-    }
 
-    //Let's count the total number of events in all notifications,
-    //so we can return that.
-    notificationsToSend.forEach((notification) => {
-      eventCount = eventCount + notification.events.length
+        //Make an array of "tasks" (= functions that return promises)
+        //The reason why we take that instead of just promises directly,
+        // is because promises start executing directly on creation.
+        //We don't want that. We want to execute them in sequence.
+        const notificationSendTasks = []
+
+        if (sendAllNotificationsInASingleRequest) {
+          //Let's send a single request with all notifications,
+          //and store the resulting promise in notificationSendPromises
+          if (this.verboseLogging) {
+            console.log("I will send " + notificationsToSend.length + " notifications in a single request")
+          }
+          notificationSendTasks.push(() => {
+            return this.energyNotificationSender.sendEnergyNotifications(notificationsToSend)
+          })
+
+        } else {
+          //Let's loop through each notification and trigger a separate request.
+          //We'll store each resulting promise in notificationSendPromises
+          if (this.verboseLogging) {
+            console.log("I will send " + notificationsToSend.length + " notifications as separate requests")
+          }
+          notificationsToSend.forEach((notification) => {
+            notificationSendTasks.push(() => {
+              return this.energyNotificationSender.sendEnergyNotification(notification)
+            })
+          })
+        }
+
+        //Let's count the total number of events in all notifications,
+        //so we can return that.
+        notificationsToSend.forEach((notification) => {
+          eventCount = eventCount + notification.events.length
+        })
+        if (this.verboseLogging) {
+          console.log("... the notifications contain " + eventCount + " energy events in total")
+        }
+
+        //Return a promise that waits for all notifications to complete, in sequence
+        return executeTasksInSequence(notificationSendTasks)
+          .then(() => {
+            //OK, all notications were successfully sent (or there weren't any)
+            //Let's update the file state.
+            this._removeProcessingForAllMeters()
+            this._saveLastIncompleteEventForAllMeters()
+            return eventCount
+          })
+
+
     })
-    if (this.verboseLogging) {
-      console.log("... the notifications contain " + eventCount + " energy events in total")
-    }
 
-    //Return a promise that waits for all notifications to complete, in sequence
-    return executeTasksInSequence(notificationSendTasks)
-      .then(() => {
-        //OK, all notications were successfully sent (or there weren't any)
-        //Let's update the file state.
-        this._removeProcessingForAllMeters()
-        this._saveLastIncompleteEventForAllMeters()
-        return eventCount
-      })
+
+
   }
 
+  /**
+   * Returns a promise that resolves into an array of notification batches.
+   */
   _createEnergyNotifications(meterName) {
     console.assert(meterName, "meterName is missing")
 
@@ -171,50 +193,51 @@ class PulseProcessor {
     }
 
     //Get all the events in processing
-    const events = this._createEnergyEventsFromPulses(meterName)
+    return this._createEnergyEventsFromPulses(meterName)
+      .then((events) => {
+        if (this.verboseLogging) {
+          console.log("Grouping " + events.length + " energyEvents into batches...")
+        }
+  
+        //Package them into batches ( so we don't send too big notifications and run into timeout problems)
+        const batches = util.batchArrayItems(events, this.maxEventsPerNotification)
+  
+        if (this.verboseLogging) {
+          console.log("We ended up with " + batches.length + " batches. Each one will turn into one notification.")
+        }
+  
+        /* batches should now contain something like this:
+         [
+         [event1, event2],
+         [event3, event4],
+         [event5]
+         ]
+         So this is 3 batches, with max 2 events per batch (based on maxEventsPerNotification)
+         */
+  
+        //Let's make one notification per batch.
+        batches.forEach((batch) => {
+          const notification = {
+            meterName: meterName,
+            events: batch
+          }
+          /*
+           notification is something like:
+           {
+           meterName: 11112222
+           events: [event1, event2, event3]
+           */
+          notifications.push(notification)
+        })
+        return notifications
+      })
 
-    if (this.verboseLogging) {
-      console.log("Grouping " + events.length + " energyEvents into batches...")
-    }
 
-
-    //Package them into batches ( so we don't send too big notifications and run into timeout problems)
-    const batches = util.batchArrayItems(events, this.maxEventsPerNotification)
-
-    if (this.verboseLogging) {
-      console.log("We ended up with " + batches.length + " batches. Each one will turn into one notification.")
-    }
-
-
-    /* batches should now contain something like this:
-     [
-     [event1, event2],
-     [event3, event4],
-     [event5]
-     ]
-     So this is 3 batches, with max 2 events per batch (based on maxEventsPerNotification)
-     */
-
-    //Let's make one notification per batch.
-    batches.forEach((batch) => {
-      const notification = {
-        meterName: meterName,
-        events: batch
-      }
-      /*
-       notification is something like:
-       {
-       meterName: 11112222
-       events: [event1, event2, event3]
-       */
-      notifications.push(notification)
-    })
-    return notifications
   }
 
 
   /**
-   * Returns an array of completed energy events,
+   * Returns a promise that resolves to an array of completed energy events,
    * starting from this.lastIncompleteEvent.xxx and adding more based on the pulses in data/xxx/processing.
    * Will update this.lastIncompleteEvent.xxx with the pulses after the last complete event.
    * Does not update any files.
@@ -223,47 +246,51 @@ class PulseProcessor {
     console.assert(meterName, "meterName is missing")
 
     const energyEvents = []
-    const pulses = this._getPulsesInProcessing(meterName)
 
-    if (this.verboseLogging) {
-      console.log("Grouping " + pulses.length + " pulses into energy events...")
-    }
-    let lastLogTime = new Date().getTime()
-    let pulseCount = pulses.length
-    let processedPulses = 0
-    pulses.forEach((pulse) => {
-      if (!this.lastIncompleteEvent[meterName]) {
-        //We had no lastIncompleteEvent. So let's create one from this pulse.
-        this.lastIncompleteEvent[meterName] = this._createEvent(pulse)
-      } else {
-        if (this._doesPulseBelongInLastIncompleteEvent(meterName, pulse)) {
-          //This pulse belongs in the last incomplete event.
-          //So let's increment the energy counter there.
-          this.lastIncompleteEvent[meterName].energy = this.lastIncompleteEvent[meterName].energy + this.energyPerPulse
-
-        } else {
-          //This pulse is beyond the end of the last incomplete event
-          //Let's flush the current event and start a new one.
-          energyEvents.push(this.lastIncompleteEvent[meterName])
-          this.lastIncompleteEvent[meterName] = this._createEvent(pulse)
+    return this._getPulsesInProcessing(meterName)
+      .then((pulses) => {
+        if (this.verboseLogging) {
+          console.log("Grouping " + pulses.length + " pulses into energy events...")
         }
-      }
-      processedPulses += 1
-      //If it's taken more than 5 seconds, log how we're doing.
-      if (new Date().getTime() - lastLogTime > 5000) {
-        const percentDone =  ((processedPulses / pulseCount) * 100).toFixed(2)
-        console.log(`${processedPulses} / ${pulseCount} pulses processed (${percentDone} %)`)
-        lastLogTime = new Date().getTime()
-      }
-    })
-    if (this.verboseLogging) {
-      console.log("We ended up with " + energyEvents.length + " energy events")
-    }
-    return energyEvents
+        let lastLogTime = new Date().getTime()
+        let pulseCount = pulses.length
+        let processedPulses = 0
+        pulses.forEach((pulse) => {
+          if (!this.lastIncompleteEvent[meterName]) {
+            //We had no lastIncompleteEvent. So let's create one from this pulse.
+            this.lastIncompleteEvent[meterName] = this._createEvent(pulse)
+          } else {
+            if (this._doesPulseBelongInLastIncompleteEvent(meterName, pulse)) {
+              //This pulse belongs in the last incomplete event.
+              //So let's increment the energy counter there.
+              this.lastIncompleteEvent[meterName].energy = this.lastIncompleteEvent[meterName].energy + this.energyPerPulse
+
+            } else {
+              //This pulse is beyond the end of the last incomplete event
+              //Let's flush the current event and start a new one.
+              energyEvents.push(this.lastIncompleteEvent[meterName])
+              this.lastIncompleteEvent[meterName] = this._createEvent(pulse)
+            }
+          }
+          processedPulses += 1
+          //If it's taken more than 5 seconds, log how we're doing.
+          if (new Date().getTime() - lastLogTime > 5000) {
+            const percentDone =  ((processedPulses / pulseCount) * 100).toFixed(2)
+            console.log(`${processedPulses} / ${pulseCount} pulses processed (${percentDone} %)`)
+            lastLogTime = new Date().getTime()
+          }
+        })
+        if (this.verboseLogging) {
+          console.log("We ended up with " + energyEvents.length + " energy events")
+        }
+        return energyEvents
+      })
+
+
   }
 
-  /**
-   * Returns an array of valid dates from data/xxx/processing
+   /*
+    Returns a promise that resolves to an array of valid dates from data/xxx/processing
    */
   _getPulsesInProcessing(meterName) {
     console.assert(meterName, "meterName is missing")
@@ -271,67 +298,44 @@ class PulseProcessor {
     const processingFile = this._getProcessingFile(meterName)
 
     if (!fs.existsSync(processingFile)) {
-      return []
+      return Promise.resolve([])
     }
 
     if (this.verboseLogging) {
       console.log("Reading the 'processing' file...")
     }
 
-    const contents = fs.readFileSync(processingFile)
-    const length = contents.length
-    //Warn if the file is bigger than 100Mb
-    if (length > 100 * 1000 * 1000) {
-      console.log("WARNING: the 'processing' file is " + length + " bytes large! Parsing could take a while.")
-    }
+    return new Promise((resolve, reject) => {
+      const pulses = []
+      let lastLogTime = new Date().getTime()
 
+      const lineReader = new LineByLineReader(processingFile)
 
-    if (this.verboseLogging) {
-      console.log("The 'processing' file has length " + contents.length + ". Looping through each line...")
-    }
+      lineReader.on('error', (err) => {
+        console.log("Error occurred while parsing 'processing' file", err)
+        reject(err)
+      });
 
-
-    //Now we need to parse this line by line. We used to do that like this:
-    //const lines = contents.toString().trim().split('\n')
-    //But that doesn't work if the file is > 192Mb (which it could be for a meter that has been offline for a while).
-    //https://github.com/nodejs/node/issues/4266
-    //So, instead of toString for the whole buffer, we do it the low-level way.
-
-    const pulses = []
-
-    let lastLogTime = new Date().getTime()
-
-    //Loop through each character, and every time we hit end of line we turn it into a pulse.
-    var line = ""
-    for (let i = 0; i < length; ++i) {
-      var char = contents.toString('utf8', i, i + 1)
-      if (char == '\n') {
-        //Aha, end of line! Turn it into a pulse
+      lineReader.on('line', (line) => {
+        // 'line' contains the current line without the trailing newline character.
         this._addPulseFromString(pulses, line)
-        line = ""
-      } else {
-        //Not end of line. So this character is a continuation of the current line
-        line = line + char
-      }
-      //If it's taken more than 5 seconds, log how we're doing.
-      if (new Date().getTime() - lastLogTime > 5000) {
-        const percentDone =  ((i / length) * 100).toFixed(2)
-        console.log(`${i} / ${length} bytes parsed (${percentDone} %)`)
-        lastLogTime = new Date().getTime()
-      }
-    }
 
-    if (line) {
-      //Aha, we reached end of file and there is an unprocessed line. Turn it into a pulse!
-      this._addPulseFromString(pulses, line)
-    }
+        //If it's taken more than 5 seconds, log how we're doing.
+        if (new Date().getTime() - lastLogTime > 5000) {
+          console.log(`${pulses.length} pulses parsed so far from 'processing' file. Latest one: ${line}`)
+          lastLogTime = new Date().getTime()
+        }
+      });
 
-    if (this.verboseLogging) {
-      console.log("Successfully parsed " + pulses.length + " lines from 'processing'")
-    }
+      lineReader.on('end', () => {
+        if (this.verboseLogging) {
+          console.log("Finished parsing 'processing' file!")
+        }
+        resolve(pulses)
+      });
 
+    })
 
-    return pulses
   }
 
   _addPulseFromString(pulses, line) {
