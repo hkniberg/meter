@@ -273,7 +273,6 @@ class PulseProcessor {
       }
       //If it's taken more than 5 seconds, log how we're doing.
       if (new Date().getTime() - lastLogTime > 5000) {
-        const percentDone =  ((processedPulses / pulseCount) * 100).toFixed(2)
         console.log(`${pulseCount} pulses processed, ${eventCount} energyEvents created. Latest pulse: ${pulse}`)
         lastLogTime = new Date().getTime()
       }
