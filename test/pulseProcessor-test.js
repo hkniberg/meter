@@ -33,7 +33,8 @@ describe('PulseProcessor', function() {
     const eventInterval = 10
     const maxEventsPerNotification = 5
     const energyPerPulse = 1
-    this.processor = new PulseProcessor("data", [meterName], eventInterval, maxEventsPerNotification, energyPerPulse, this.sender)
+    const verboseLogging = false
+    this.processor = new PulseProcessor("data", [meterName], eventInterval, maxEventsPerNotification, energyPerPulse, this.sender, verboseLogging)
     fs.mkdirSync("data/" + meterName)
   })
 

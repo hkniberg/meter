@@ -173,8 +173,18 @@ class PulseProcessor {
     //Get all the events in processing
     const events = this._createEnergyEventsFromPulses(meterName)
 
+    if (this.verboseLogging) {
+      console.log("Grouping " + events.length + " energyEvents into batches...")
+    }
+
+
     //Package them into batches ( so we don't send too big notifications and run into timeout problems)
     const batches = util.batchArrayItems(events, this.maxEventsPerNotification)
+
+    if (this.verboseLogging) {
+      console.log("We ended up with " + batches.length + " batches. Each one will turn into one notification.")
+    }
+
 
     /* batches should now contain something like this:
      [
@@ -215,6 +225,9 @@ class PulseProcessor {
     const energyEvents = []
     const pulses = this._getPulsesInProcessing(meterName)
 
+    if (this.verboseLogging) {
+      console.log("Grouping " + pulses.length + " pulses into energy events...")
+    }
     pulses.forEach((pulse) => {
       if (!this.lastIncompleteEvent[meterName]) {
         //We had no lastIncompleteEvent. So let's create one from this pulse.
@@ -233,6 +246,9 @@ class PulseProcessor {
         }
       }
     })
+    if (this.verboseLogging) {
+      console.log("We ended up with " + energyEvents.length + " energy events")
+    }
     return energyEvents
   }
 
@@ -248,7 +264,16 @@ class PulseProcessor {
       return []
     }
 
+    if (this.verboseLogging) {
+      console.log("Reading the 'processing' file...")
+    }
+
     const contents = fs.readFileSync(processingFile)
+
+    if (this.verboseLogging) {
+      console.log("The 'processing' file has length " + contents.length + ". Looping through each line...")
+    }
+
 
     //Now we need to parse this line by line. We used to do that like this:
     //const lines = contents.toString().trim().split('\n')
@@ -266,12 +291,7 @@ class PulseProcessor {
       var char = contents.toString('utf8', i, i + 1)
       if (char == '\n') {
         //Aha, end of line! Turn it into a pulse
-        const pulse = new Date(line)
-        if (isNaN(pulse.getTime())) {
-          console.log("Ignoring invalid pulse: " + line)
-        } else {
-          pulses.push(pulse)
-        }
+        this._addPulseFromString(pulses, line)
         line = ""
       } else {
         //Not end of line. So this character is a continuation of the current line
@@ -281,15 +301,32 @@ class PulseProcessor {
 
     if (line) {
       //Aha, we reached end of file and there is an unprocessed line. Turn it into a pulse!
+      this._addPulseFromString(pulses, line)
+    }
+
+    if (this.verboseLogging) {
+      console.log("Successfully parsed " + pulses.length + " lines from 'processing'")
+    }
+
+
+    return pulses
+  }
+
+  _addPulseFromString(pulses, line) {
+    line = line.trim()
+    if (line) {
       const pulse = new Date(line)
       if (isNaN(pulse.getTime())) {
-        console.log("Ignoring invalid pulse at end of file: " + line)
+        console.log("Ignoring invalid pulse: " + line)
       } else {
         pulses.push(pulse)
       }
+      line = ""
+    } else {
+      //Line was empty
     }
 
-    return pulses
+
   }
 
   /*
