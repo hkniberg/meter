@@ -2,6 +2,7 @@
 .#*
 ticks
 storagetest
+scalingtest
 
 #local config
 config/local.yml
