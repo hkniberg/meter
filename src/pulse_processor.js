@@ -228,6 +228,9 @@ class PulseProcessor {
     if (this.verboseLogging) {
       console.log("Grouping " + pulses.length + " pulses into energy events...")
     }
+    let lastLogTime = new Date().getTime()
+    let pulseCount = pulses.length
+    let processedPulses = 0
     pulses.forEach((pulse) => {
       if (!this.lastIncompleteEvent[meterName]) {
         //We had no lastIncompleteEvent. So let's create one from this pulse.
@@ -244,6 +247,13 @@ class PulseProcessor {
           energyEvents.push(this.lastIncompleteEvent[meterName])
           this.lastIncompleteEvent[meterName] = this._createEvent(pulse)
         }
+      }
+      processedPulses += 1
+      //If it's taken more than 5 seconds, log how we're doing.
+      if (new Date().getTime() - lastLogTime > 5000) {
+        const percentDone =  ((processedPulses / pulseCount) * 100).toFixed(2)
+        console.log(`${processedPulses} / ${pulseCount} pulses processed (${percentDone} %)`)
+        lastLogTime = new Date().getTime()
       }
     })
     if (this.verboseLogging) {
@@ -289,8 +299,6 @@ class PulseProcessor {
 
     const pulses = []
 
-
-    const logFrequencyMs = 5000
     let lastLogTime = new Date().getTime()
 
     //Loop through each character, and every time we hit end of line we turn it into a pulse.
@@ -305,8 +313,8 @@ class PulseProcessor {
         //Not end of line. So this character is a continuation of the current line
         line = line + char
       }
-      //If it's taken more than a second, log how we're doing.
-      if (new Date().getTime() - lastLogTime > logFrequencyMs) {
+      //If it's taken more than 5 seconds, log how we're doing.
+      if (new Date().getTime() - lastLogTime > 5000) {
         const percentDone =  ((i / length) * 100).toFixed(2)
         console.log(`${i} / ${length} bytes parsed (${percentDone} %)`)
         lastLogTime = new Date().getTime()
