@@ -249,16 +249,46 @@ class PulseProcessor {
     }
 
     const contents = fs.readFileSync(processingFile)
-    const lines = contents.toString().trim().split('\n')
+
+    //Now we need to parse this line by line. We used to do that like this:
+    //const lines = contents.toString().trim().split('\n')
+    //But that doesn't work if the file is > 192Mb (which it could be for a meter that has been offline for a while).
+    //https://github.com/nodejs/node/issues/4266
+    //So, instead of toString for the whole buffer, we do it the low-level way.
+
     const pulses = []
-    lines.forEach((line) => {
+
+    const length = contents.length
+
+    //Loop through each character, and every time we hit end of line we turn it into a pulse.
+    var line = ""
+    for (let i = 0; i < length; ++i) {
+      var char = contents.toString('utf8', i, i + 1)
+      if (char == '\n') {
+        //Aha, end of line! Turn it into a pulse
+        const pulse = new Date(line)
+        if (isNaN(pulse.getTime())) {
+          console.log("Ignoring invalid pulse: " + line)
+        } else {
+          pulses.push(pulse)
+        }
+        line = ""
+      } else {
+        //Not end of line. So this character is a continuation of the current line
+        line = line + char
+      }
+    }
+
+    if (line) {
+      //Aha, we reached end of file and there is an unprocessed line. Turn it into a pulse!
       const pulse = new Date(line)
       if (isNaN(pulse.getTime())) {
-        console.log("Ignoring invalid pulse: " + line)
+        console.log("Ignoring invalid pulse at end of file: " + line)
       } else {
         pulses.push(pulse)
       }
-    })
+    }
+
     return pulses
   }
 

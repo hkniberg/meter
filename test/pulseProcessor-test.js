@@ -244,7 +244,7 @@ describe('PulseProcessor', function() {
 
   })
 
-  it.only("shouldn't crash if there lots of stuff in processing", function() {
+  it("shouldn't crash if there lots of stuff in processing", function() {
     //Add LOTS of pulses to inbox, different buckets
     const pulseCount = 1000
     let date = moment()
