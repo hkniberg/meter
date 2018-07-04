@@ -269,6 +269,12 @@ class PulseProcessor {
     }
 
     const contents = fs.readFileSync(processingFile)
+    const length = contents.length
+    //Warn if the file is bigger than 100Mb
+    if (length > 100 * 1000 * 1000) {
+      console.log("WARNING: the 'processing' file is " + length + " bytes large! Parsing could take a while.")
+    }
+
 
     if (this.verboseLogging) {
       console.log("The 'processing' file has length " + contents.length + ". Looping through each line...")
@@ -283,7 +289,9 @@ class PulseProcessor {
 
     const pulses = []
 
-    const length = contents.length
+
+    const logFrequencyMs = 5000
+    let lastLogTime = new Date().getTime()
 
     //Loop through each character, and every time we hit end of line we turn it into a pulse.
     var line = ""
@@ -296,6 +304,12 @@ class PulseProcessor {
       } else {
         //Not end of line. So this character is a continuation of the current line
         line = line + char
+      }
+      //If it's taken more than a second, log how we're doing.
+      if (new Date().getTime() - lastLogTime > logFrequencyMs) {
+        const percentDone =  ((i / length) * 100).toFixed(2)
+        console.log(`${i} / ${length} bytes parsed (${percentDone} %)`)
+        lastLogTime = new Date().getTime()
       }
     }
 
