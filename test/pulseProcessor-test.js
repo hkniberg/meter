@@ -162,7 +162,7 @@ describe('PulseProcessor', function() {
     this.processor._stealInbox(meterName)
 
     expect(this.processor._createEnergyEventsFromPulses(meterName))
-      .to.eventually.deep.equal([])
+      .to.eventually.equal(2)
       .then(() => {
         return expect(this.processor.lastIncompleteEvent[meterName])
           .to.deep.equal(

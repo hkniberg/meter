@@ -245,6 +245,55 @@ class PulseProcessor {
   _createEnergyEventsFromPulses(meterName) {
     console.assert(meterName, "meterName is missing")
 
+
+    const energyEvents = []
+    let pulseCount = 0
+    let eventCount = 0
+
+    let lastLogTime = new Date().getTime()
+
+    return this._forEachPulseInProcessing(meterName, (pulse) => {
+      pulseCount += 1
+      if (!this.lastIncompleteEvent[meterName]) {
+        //We had no lastIncompleteEvent. So let's create one from this pulse.
+        this.lastIncompleteEvent[meterName] = this._createEvent(pulse)
+      } else {
+        if (this._doesPulseBelongInLastIncompleteEvent(meterName, pulse)) {
+          //This pulse belongs in the last incomplete event.
+          //So let's increment the energy counter there.
+          this.lastIncompleteEvent[meterName].energy = this.lastIncompleteEvent[meterName].energy + this.energyPerPulse
+
+        } else {
+          //This pulse is beyond the end of the last incomplete event
+          //Let's flush the current event and start a new one.
+          energyEvents.push(this.lastIncompleteEvent[meterName])
+          eventCount += 1
+          this.lastIncompleteEvent[meterName] = this._createEvent(pulse)
+        }
+      }
+      //If it's taken more than 5 seconds, log how we're doing.
+      if (new Date().getTime() - lastLogTime > 5000) {
+        const percentDone =  ((processedPulses / pulseCount) * 100).toFixed(2)
+        console.log(`${pulseCount} pulses processed, ${eventCount} energyEvents created. Latest pulse: ${pulse}`)
+        lastLogTime = new Date().getTime()
+      }
+    }).then(() => {
+      return energyEvents
+    })
+
+  }
+
+
+  /**
+   * Returns a promise that resolves to an array of completed energy events,
+   * starting from this.lastIncompleteEvent.xxx and adding more based on the pulses in data/xxx/processing.
+   * Will update this.lastIncompleteEvent.xxx with the pulses after the last complete event.
+   * Does not update any files.
+   */
+  /*
+  _createEnergyEventsFromPulses(meterName) {
+    console.assert(meterName, "meterName is missing")
+
     const energyEvents = []
 
     return this._getPulsesInProcessing(meterName)
@@ -287,6 +336,61 @@ class PulseProcessor {
       })
 
 
+  }
+  */
+
+  /**
+   * Does the given thing for each pulse in 'processing'.
+   *
+   * @param whatToDo a synchronous function that takes a pulse (date) as argument and does whatever needs to be done
+   * @return a promise that resolves with pulse count when everything is done.
+   */
+  _forEachPulseInProcessing(meterName, whatToDo) {
+    console.assert(meterName, "meterName is missing")
+
+    const processingFile = this._getProcessingFile(meterName)
+    let pulseCount = 0
+
+    if (!fs.existsSync(processingFile)) {
+      return Promise.resolve([])
+    }
+
+    if (this.verboseLogging) {
+      console.log("Reading the 'processing' file...")
+    }
+
+    return new Promise((resolve, reject) => {
+      const lineReader = new LineByLineReader(processingFile)
+
+      lineReader.on('error', (err) => {
+        console.log("Error occurred while parsing 'processing' file", err)
+        reject(err)
+      });
+
+      lineReader.on('line', (line) => {
+        // 'line' contains the current line without the trailing newline character.
+
+        line = line.trim()
+        if (line) {
+          const pulse = new Date(line)
+          if (isNaN(pulse.getTime())) {
+            console.log("Ignoring invalid pulse: " + line)
+          } else {
+            whatToDo(pulse)
+            pulseCount += 1
+          }
+        }
+
+      });
+
+      lineReader.on('end', () => {
+        if (this.verboseLogging) {
+          console.log("Finished parsing 'processing' file!")
+        }
+        resolve(pulseCount)
+      });
+
+    })
   }
 
    /*
