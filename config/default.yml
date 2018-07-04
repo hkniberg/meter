@@ -58,6 +58,11 @@ eventInterval: "10"
 # How much energy (in Wh) does one pulse represent?
 energyPerPulse: "1"
 
+# Set this to false to disable inbox processing for debugging purposes.
+# In that case I'll still listen for incoming pulses and store in the inbox,
+# but nothing will be done to them.
+processInbox: "true"
+
 # If true, pulses are logged in console.log
 # Should be a string, so don't skip the quotes.
 logPulseDetection: "true"

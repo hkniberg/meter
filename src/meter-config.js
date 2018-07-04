@@ -27,6 +27,7 @@ exports.loadConfig = function() {
 
     energyPerPulse: getInt('energyPerPulse', 1),
 
+    processInbox: getBool('processInbox'),
     logPulseDetection: getBool('logPulseDetection'),
     logDisplay: getBool('logDisplay'),
     verboseLogging: getBool('verboseLogging'),
