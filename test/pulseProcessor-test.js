@@ -161,8 +161,8 @@ describe('PulseProcessor', function() {
     add("2016-05-05 10:00:05.066")
     this.processor._stealInbox(meterName)
 
-    expect(this.processor._createEnergyEventsFromPulses(meterName))
-      .to.eventually.equal(2)
+    return expect(this.processor._createEnergyEventsFromPulses(meterName))
+      .to.eventually.deep.equal([])
       .then(() => {
         return expect(this.processor.lastIncompleteEvent[meterName])
           .to.deep.equal(
@@ -182,7 +182,7 @@ describe('PulseProcessor', function() {
     add("2016-05-05 10:00:11")
     this.processor._stealInbox(meterName)
 
-    expect(this.processor._createEnergyEventsFromPulses(meterName))
+    return expect(this.processor._createEnergyEventsFromPulses(meterName))
       .to.eventually.deep.equal([
       {
         endTime: "2016-05-05T10:00:10.000Z",
