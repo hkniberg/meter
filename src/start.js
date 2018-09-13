@@ -187,8 +187,8 @@ if (config.processInbox) {
   console.log("WARNING: processInbox = false, so I won't do anything with the pulses, just store them in the inbox.")
 }
 
-showCustomerInfoAndSupportPhone()
-showQrCode()
+//showCustomerInfoAndSupportPhone()
+//showQrCode()
 showDeviceId()
 
 //Update the display every second (if showing tick count)
