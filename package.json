@@ -25,7 +25,7 @@
     "json-rpc2": "1.0.2",
     "line-by-line": "0.1.6",
     "moment": "2.22.2",
-    "parallelshell": "3.0.2",
+    "parallelshell": "3.0.1",
     "promise": "8.0.2",
     "promise-retry": "1.1.1",
     "request": "2.88.0",
