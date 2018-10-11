@@ -72,7 +72,7 @@ describe('PulseProcessor', function() {
 
   it("_doesPulseBelongInLastIncompleteEvent", function() {
     this.processor.lastIncompleteEvent[meterName] = {
-      endTime: new Date("2016-05-10T12:00:10"),
+      endTime: new Date("2016-05-10T12:00:10Z"),
       seconds: 10,
       energy: 1
     }
