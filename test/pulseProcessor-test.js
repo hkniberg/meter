@@ -2,6 +2,7 @@ const nock = require('nock')
 const mocha = require("mocha")
 const chai = require("chai");
 const moment = require('moment')
+const rmdirRecursiveSync = require('rmdir-recursive').sync
 
 chai.use(require('chai-datetime'));
 chai.use(require("chai-as-promised"));
@@ -13,8 +14,11 @@ const FakeEnergyNotificationSender = require('./fake-energy-notification-sender'
 const PulseProcessor = require("../src/pulse_processor")
 
 const fs = require('fs')
-const mockfs = require('mock-fs')
+const path = require('path')
+const testFilesDir = path.resolve(__dirname, "..", "tempTestFiles")
 const meterName = '11112222'
+const meterDir = path.resolve(testFilesDir, meterName)
+
 
 /**
  * Adds the given pulse to the inbox.
@@ -22,24 +26,26 @@ const meterName = '11112222'
  * https://en.wikipedia.org/wiki/ISO_8601#Time_zone_designators
  */
 function add(dateString) {
-  fs.appendFileSync("data/" + meterName + "/inbox", new Date(dateString + "Z").toISOString() + "\n")
+  const inboxDir = path.resolve(meterDir, "inbox")
+  fs.appendFileSync(inboxDir, new Date(dateString + "Z").toISOString() + "\n")
 }
 
 describe('PulseProcessor', function() {
 
   beforeEach(function() {
-    mockfs()
+    fs.mkdirSync(testFilesDir)
+    
     this.sender = new FakeEnergyNotificationSender()
     const eventInterval = 10
     const maxEventsPerNotification = 5
     const energyPerPulse = 1
     const verboseLogging = true
-    this.processor = new PulseProcessor("data", [meterName], eventInterval, maxEventsPerNotification, energyPerPulse, this.sender, verboseLogging)
-    fs.mkdirSync("data/" + meterName)
+    this.processor = new PulseProcessor(testFilesDir, [meterName], eventInterval, maxEventsPerNotification, energyPerPulse, this.sender, verboseLogging)
+    fs.mkdirSync(meterDir)
   })
 
   afterEach(function() {
-    mockfs.restore()
+    rmdirRecursiveSync(testFilesDir)
   })
 
   it("_getEndTime", function() {
@@ -101,7 +107,7 @@ describe('PulseProcessor', function() {
   })
 
   it('load/save lastIncompleteEvent', function() {
-    const lastIncompleteEventFile = 'data/' + meterName + '/last-incomplete-event.json'
+    const lastIncompleteEventFile = path.resolve(meterDir, 'last-incomplete-event.json')
 
     //When we start there should be no file
     expect(this.processor.lastIncompleteEvent[meterName]).to.be.null

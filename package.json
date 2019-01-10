@@ -17,7 +17,7 @@
     "chai-datetime": "1.5.0",
     "mocha": "5.2.0",
     "nock": "10.0.1",
-    "mock-fs": "4.7.0"
+    "rmdir-recursive": "0.0.1"
   },
   "dependencies": {
     "config": "2.0.1",
