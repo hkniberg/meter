@@ -1,24 +1,25 @@
 const chai = require("chai");
 const expect = chai.expect
 
-const mockfs = require('mock-fs')
 const PersistentCounter = require('../src/persistent_counter')
+const rmdirRecursiveSync = require('rmdir-recursive').sync
 
 const fs = require('fs')
+const path = require('path')
 
-const counterFile = "data/test-counter"
+const testFilesDir = path.resolve(__dirname, "..", "tempTestFiles")
+const counterFile = path.resolve(testFilesDir, "test-counter")
 let counter
 
 describe('PulseProcessor', function() {
 
   beforeEach(function () {
-    mockfs({'data': []})
-
+    fs.mkdirSync(testFilesDir)
     counter = new PersistentCounter(counterFile)
   })
-  
+
   afterEach(function() {
-    mockfs.restore()
+    rmdirRecursiveSync(testFilesDir)
   })
 
   it('can read empty file', function() {
