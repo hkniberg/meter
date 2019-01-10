@@ -1,6 +1,7 @@
 # Temporary files.
 
 data
+tempTestFiles
 
 .#*
 ticks
